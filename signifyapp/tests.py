@@ -1,53 +1,135 @@
-import unittest
-from django.test import Client
+from django.test import TestCase
 from django.contrib.auth.models import User
-from .models import Invoice, Light, Component
-from django.utils import timezone
-from django.urls import reverse
+from django.test import Client
+from .models import Component, Invoice # Załóżmy, że nazwa twojej aplikacji to 'myapp'
 
-class TestViews(unittest.TestCase):
-
-    def setUp(self):
+class UserAuthenticationTestCase(TestCase):
+    def setUp_user(self):
+        # Tworzenie użytkownika testowego
+        self.username = 'testuser'
+        self.password = 'testpassword'
+        self.user = User.objects.create_user(username=self.username, password=self.password)
         self.client = Client()
-        self.user = User.objects.create_user(username='testuser', password='testpassword')
-        self.client.force_login(self.user)
 
-    def test_login_existing_view(self):
-        response = self.client.post(reverse('login_existing'), {'username': 'testuser', 'password': 'testpassword'})
-        self.assertEqual(response.status_code, 302)  # should redirect to notifications
+    def setUp_admin(self):
+        # Tworzenie użytkownika testowego
+        self.username = 'admin'
+        self.password = 'adminpassword'
+        self.user = User.objects.create_user(username=self.username, password=self.password)
+        self.client = Client()
 
-    def test_signup_view(self):
-        response = self.client.post(reverse('signup'), {'username': 'newuser', 'password1': 'newpassword', 'password2': 'newpassword'})
-        self.assertEqual(response.status_code, 302)  # should redirect to notifications
+    def test_user_login(self):
+        # Sprawdź, czy użytkownik może się zalogować z poprawnymi danymi
+        login_successful = self.client.login(username='testuser', password='testpassword')
+        self.assertTrue(login_successful)
+        
+        # Sprawdź, czy użytkownik jest teraz zalogowany
+        user = User.objects.get(username=self.username)
+        self.assertTrue(user.is_authenticated)
 
-    def test_logout_view(self):
-        response = self.client.get(reverse('logout_view'))
-        self.assertEqual(response.status_code, 302)  # should redirect to login
-
-    def test_check_payment_deadline_authenticated(self):
-        invoice = Invoice.objects.create(user=self.user, payment_due_date=timezone.now().date())
-        light = Light.objects.create(invoice=invoice)
-        response = self.client.get(reverse('check_payment_deadline'))
-        self.assertEqual(response.status_code, 200)  # should render template.html
-
-    def test_display_records_with_average_above_10_authenticated(self):
-        component = Component.objects.create(user=self.user, average=15)
-        response = self.client.get(reverse('display_records_with_average_above_10'))
-        self.assertEqual(response.status_code, 200)  # should render template_with_records.html
-
-    def test_index_authenticated(self):
-        response = self.client.get(reverse('index'))
-        self.assertEqual(response.status_code, 200)  # should render index.html
-
-    def test_index_start_stop(self):
-        response_start = self.client.post(reverse('index'), {'start': True})
-        self.assertEqual(response_start.status_code, 200)  # should render index.html
-        response_stop = self.client.post(reverse('index'), {'stop': True})
-        self.assertEqual(response_stop.status_code, 200)  # should render index.html
-
-    def tearDown(self):
+    def test_admin_login(self):
+        # Sprawdź, czy użytkownik może się zalogować z poprawnymi danymi
+        login_successful = self.client.login(username='admin', password='adminpassword')
+        self.assertTrue(login_successful)
+        
+        # Sprawdź, czy użytkownik jest teraz zalogowany
+        user = User.objects.get(username=self.username)
+        self.assertTrue(user.is_authenticated)
+    
+    def test_user_logout(self):       
+        # Wyloguj użytkownika
         self.client.logout()
+
+    def deleteAccountUser(self):
+        # Utwórz użytkownika do testów
+        self.username = 'testuser'
+        self.password = 'testpassword'
+        self.user = User.objects.get(username=self.username, password=self.password)
         self.user.delete()
 
-if __name__ == '__main__':
-    unittest.main()
+    def deleteAccountAdmin(self):
+        # Utwórz użytkownika do testów
+        self.username = 'admin'
+        self.password = 'adminpassword'
+        self.user = User.objects.get(username=self.username, password=self.password)
+        self.user.delete()
+
+class ComponentTestCase(TestCase):
+    def setUpFalse(self):
+        # Tworzenie użytkownika testowego
+        self.user = User.objects.create_user(username='testuser', password='12345')
+        
+        # Tworzenie rekordów komponentów dla użytkownika testowego
+        Component.objects.create(user=self.user, average=5)
+
+    def setUpTrue(self):
+        # Tworzenie użytkownika testowego
+        self.user = User.objects.create_user(username='testuser', password='12345')
+        
+        # Tworzenie rekordów komponentów dla użytkownika testowego
+        Component.objects.create(user=self.user, average=15)
+
+    def tearDown(self):
+        # Usunięcie danych testowych
+        User.objects.filter(username='testuser').delete()
+
+class InvoiceModelTestCase(TestCase):
+    def setUp(self):
+        # Create a test user
+        self.user = User.objects.create(username='test_user', password='password123')
+
+    def test_invoice_creation(self):
+        # Tworzenie nowej faktury z ręcznie ustawioną datą płatności
+        invoice = Invoice.objects.create(
+            payment_due_date='2024-04-06',
+            user=self.user,
+            is_paid=False
+        )
+
+        # Sprawdzenie, czy faktura została utworzona pomyślnie
+        self.assertIsNotNone(invoice)
+        self.assertEqual(invoice.user, self.user)
+        self.assertFalse(invoice.is_paid)
+
+    def test_invoice_deletion(self):
+        # Tworzenie nowej faktury
+        invoice = Invoice.objects.create(
+            payment_due_date='2024-04-06',
+            user=self.user,
+            is_paid=False
+        )
+
+        # Usuwanie faktury
+        invoice.delete()
+
+        # Spróbowanie odzyskać usuniętą fakturę
+        try:
+            deleted_invoice = Invoice.objects.get(pk=invoice.pk)
+        except Invoice.DoesNotExist:
+            deleted_invoice = None
+
+        # Sprawdzenie, czy faktura została pomyślnie usunięta
+        self.assertIsNone(deleted_invoice)
+
+    def test_invoice_update(self):
+        # Tworzenie nowej faktury
+        invoice = Invoice.objects.create(
+            payment_due_date='2024-04-06',
+            user=self.user,
+            is_paid=False
+        )
+
+        # Aktualizacja faktury
+        invoice.is_paid = True
+        invoice.save()
+
+        # Pobranie zaktualizowanej faktury z bazy danych
+        updated_invoice = Invoice.objects.get(pk=invoice.pk)
+
+        # Sprawdzenie, czy faktura została pomyślnie zaktualizowana
+        self.assertTrue(updated_invoice.is_paid)
+
+    def tearDown(self):
+        # Clean up test data
+        User.objects.all().delete()
+        Invoice.objects.all().delete()

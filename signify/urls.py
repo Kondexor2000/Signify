@@ -1,29 +1,18 @@
-"""
-URL configuration for signify project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/4.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
-from django.contrib import admin
 from django.urls import path
 from signifyapp import views
 
-
 urlpatterns = [
     path('login/', views.login_existing, name='login_existing'),
-    path('signup/', views.signup, name='signup'),
-    path('logout/', views.logout_view, name='logout_existing'),
-    path('notifications/', views.check_payment_deadline, name='notifications'),
-    path('records/', views.display_records_with_average_above_10, name='records'),
+    path('signup/', views.SignUpView.as_view(), name='signup'),
+    path('logout/', views.CustomLogoutView.as_view(), name='logout'),
+    path('edit-profile/', views.EditProfileView.as_view(), name='edit_profile'),
+    path('delete-account/', views.DeleteAccountView.as_view(), name='delete_account'),
+    path('add-invoice/', views.AddInvoiceView.as_view(), name='add_invoice'),
+    path('read-invoices/', views.read_invoices, name='read_invoices'),
+    path('read-invoices-by-admin/', views.read_invoices_by_admin, name='read_invoices_by_admin'),
+    path('update-invoice/<int:pk>/', views.UpdateInvoiceView.as_view(), name='update_invoice'),
+    path('delete-invoice/<int:pk>/', views.DeleteInvoiceView.as_view(), name='delete_invoice'),
+    path('check-payment-deadline/', views.check_payment_deadline, name='check_payment_deadline'),
+    path('display-records-above-10/', views.display_records_with_average_above_10, name='display_records_above_10'),
     path('', views.index, name='index'),
 ]
