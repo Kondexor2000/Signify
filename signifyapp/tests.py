@@ -1,5 +1,5 @@
 from django.test import TestCase
-from django.contrib.auth.models import User, AnonymousUser
+from django.contrib.auth.models import User
 from django.test import Client
 from .models import Component, Invoice # Załóżmy, że nazwa twojej aplikacji to 'myapp'
 
