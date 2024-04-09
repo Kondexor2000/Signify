@@ -2,7 +2,7 @@ from django.urls import path
 from signifyapp import views
 
 urlpatterns = [
-    path('login/', views.login_existing, name='login_existing'),
+    path('login/', views.CustomLoginView.as_view(), name='login_existing'),
     path('signup/', views.SignUpView.as_view(), name='signup'),
     path('logout/', views.CustomLogoutView.as_view(), name='logout'),
     path('edit-profile/', views.EditProfileView.as_view(), name='edit_profile'),

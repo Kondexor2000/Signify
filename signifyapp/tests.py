@@ -1,5 +1,5 @@
 from django.test import TestCase
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, AnonymousUser
 from django.test import Client
 from .models import Component, Invoice # Załóżmy, że nazwa twojej aplikacji to 'myapp'
 
@@ -133,3 +133,20 @@ class InvoiceModelTestCase(TestCase):
         # Clean up test data
         User.objects.all().delete()
         Invoice.objects.all().delete()
+
+class InvoiceListViewTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        # Tworzymy testowego użytkownika
+        test_user = User.objects.create_user(username='testuser', password='testpassword')
+        test_user.save()
+
+        # Tworzymy kilka testowych faktur
+        number_of_invoices = 5
+        for invoice_id in range(number_of_invoices):
+            Invoice.objects.create(user=test_user, number=f'INV00{invoice_id}', amount=(invoice_id + 1) * 100)
+
+    def tearDown(self):
+        # Czyszczenie danych testowych po każdym teście
+        User.objects.filter(username='testuser').delete()
+

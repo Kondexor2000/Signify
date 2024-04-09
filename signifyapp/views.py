@@ -11,6 +11,22 @@ from django.utils import timezone
 from .models import Invoice, Light, Component
 from .forms import InvoiceForm
 from django.contrib import messages
+from django.contrib.auth.views import LoginView
+
+class CustomLoginView(LoginView):
+    template_name = 'login.html'  # Szablon używany do renderowania formularza logowania
+    redirect_authenticated_user = True  # Przekierowuje zalogowanego użytkownika na domyślną stronę
+
+    def form_valid(self, form):
+        """Wywoływane, gdy formularz logowania jest prawidłowy."""
+        remember_me = form.cleaned_data['remember_me']  # Załóżmy, że istnieje pole remember_me w formularzu
+        if remember_me:
+            self.request.session.set_expiry(1209600)  # Ustawia czas trwania sesji na 2 tygodnie
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        """Zwraca adres URL, na który ma być przekierowany użytkownik po zalogowaniu."""
+        return reverse_lazy('index')  # Załóżmy, że home to nazwa URL dla strony głównej aplikacji
 
 # Utworzenie kont klientów Signify
 class SignUpView(CreateView):
