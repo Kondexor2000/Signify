@@ -16,7 +16,18 @@ class Light(models.Model):
 
 #Wzór na obliczanie średniej zużytych prądów
 class Component(models.Model):
-    series = models.IntegerField()
-    time = models.FloatField()
-    average = models.FloatField()
+    series = models.IntegerField(default=0)
+    time = models.FloatField(default=0.0)
+    average = models.FloatField(default=0.0)
     user = models.OneToOneField(User, on_delete=models.CASCADE)
+
+    def save(self, *args, **kwargs):
+        # Upewnij się, że `series` nie jest zerowe, aby uniknąć błędu dzielenia przez zero
+        if self.series > 0:
+            self.average = self.time / self.series
+        else:
+            self.average = 0.0
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Component for {self.user.username}: series={self.series}, average={self.average}"

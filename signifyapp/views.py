@@ -8,9 +8,7 @@ from django.template import TemplateDoesNotExist
 from django.views.generic.edit import CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
-from django.utils import timezone
-from .models import Invoice, Light, Component
-from .forms import InvoiceForm
+from .models import Component
 from django.contrib import messages
 from django.contrib.auth.views import LoginView
 from django.template.loader import get_template
@@ -96,90 +94,6 @@ class DeleteAccountView(LoginRequiredMixin, DeleteView):
             messages.error(request, f"Wystąpił błąd: {str(e)}")
             return redirect('delete_account')
 
-class AddInvoiceView(LoginRequiredMixin, CreateView):
-    form_class = InvoiceForm
-    template_name = 'comment.html'
-    success_url = reverse_lazy('post_detail')
-
-    def form_valid(self, form):
-        form.instance.user = self.request.user
-        return super().form_valid(form)
-    
-    def dispatch(self, request, *args, **kwargs):
-        if not check_template(self.template_name, request):
-            return redirect('post_detail')
-
-        return super().dispatch(request, *args, **kwargs)
-
-def read_invoices(request):
-    template_name = 'comment.html'
-    if not check_template(template_name, request):
-        return redirect('gdzieś_indziej')
-
-    user = request.user
-    comments = Invoice.objects.filter(is_paid=False, user=user)
-    return render(request, template_name, {'comments': comments})
-
-def read_invoices_by_admin(request):
-    template_name = 'comment.html'
-    if not check_template(template_name, request):
-        return redirect('gdzieś_indziej')
-
-    comments = Invoice.objects.all()
-    return render(request, template_name, {'comments': comments})
-
-class UpdateInvoiceView(LoginRequiredMixin, UpdateView):
-    model = Invoice
-    form_class = InvoiceForm
-    template_name = 'update_invoice.html'
-    success_url = reverse_lazy('post_detail')
-
-    def dispatch(self, request, *args, **kwargs):
-        if not check_template(self.template_name, request):
-            return redirect('post_detail')
-
-        return super().dispatch(request, *args, **kwargs)
-
-class DeleteInvoiceView(LoginRequiredMixin, DeleteView):
-    model = Invoice
-    template_name = 'delete_invoice.html'
-    success_url = reverse_lazy('post_detail')
-
-    def dispatch(self, request, *args, **kwargs):
-        if not check_template(self.template_name, request):
-            return redirect('post_detail')
-
-        return super().dispatch(request, *args, **kwargs)
-
-@transaction.atomic
-def check_payment_deadline(request):
-    template_name = 'comment.html'
-    if not check_template(template_name, request):
-        return redirect('gdzieś_indziej')
-
-    if request.user.is_authenticated:
-        template_name = 'template.html'
-        if not check_template(template_name, request):
-            return redirect('gdzieś_indziej')
-
-        overdue_invoices = Invoice.objects.filter(user=request.user, payment_due_date__lt=timezone.now().date(), is_paid=False)
-        for invoice in overdue_invoices:
-            if invoice.last > invoice.payment_due_date:
-                try:
-                    light = Light.objects.get(invoice=invoice)
-                    light.is_on = False
-                    light.user = request.user
-                    light.save()
-                    raport = "Wyłączyliśmy światło, ponieważ nie zapłaciłeś rachunku w terminie"
-                except Light.DoesNotExist:
-                    pass
-        else:
-            raport = "Rachunki zapłacone! Światło jest w twoich rękach"
-        return render(request, template_name, {'components': raport})
-    else:
-        messages.error(request, 'Nie jesteś zalogowany.')
-        return redirect('login_existing')
-
 @transaction.atomic
 def display_records_with_average_above_10(request):
     if request.user.is_authenticated:
@@ -187,16 +101,26 @@ def display_records_with_average_above_10(request):
         if not check_template(template_name, request):
             return redirect('login_existing')
 
+        # Pobierz komponenty z average > 10 i wypisz je w logach
         components = Component.objects.filter(user=request.user, average__gt=10)
+        
+        # Diagnostyka - wypisanie liczby komponentów i ich wartości średnich
+        print(f"Znaleziono {components.count()} komponentów z average > 10")
+        for component in components:
+            print(f"Komponent ID: {component.id}, Average: {component.average}")
+
+        # Sprawdź, czy są jakieś komponenty powyżej średniej 10
         if components.exists():
             raport = 'Proponujemy bardziej oszczędne światło'
         else:
             raport = "Gratulujemy oszczędności światła"
-        return render(request, 'template_with_records.html', {'components': raport})
+        
+        return render(request, 'template_with_records.html', {'raport': raport})
+    
     else:
         messages.error(request, 'Nie jesteś zalogowany.')
         return redirect('login_existing')
-
+    
 @transaction.atomic
 def index(request):
     if request.user.is_authenticated:
@@ -204,29 +128,42 @@ def index(request):
         if not check_template(template_name, request):
             return redirect('login_existing')
 
-        component, created = Component.objects.get_or_create(user=request.user, defaults={'series': 0, 'time': 0, 'average': 0})
+        # Upewniamy się, że Component istnieje dla danego użytkownika
+        component, created = Component.objects.get_or_create(
+            user=request.user, 
+            defaults={'series': 0, 'time': 0, 'average': 0}
+        )
         
+        # Pobieramy czas startu z sesji
         start_time = request.session.get('start_time')
 
+        # Obsługa przycisku "start"
         if 'start' in request.POST:
-            if start_time is None:
+            if start_time is None:  # Start tylko, gdy nie ma czasu początkowego
                 start_time = time.time()
                 request.session['start_time'] = start_time
+
+        # Obsługa przycisku "stop"
         elif 'stop' in request.POST:
-            if start_time is not None:
+            if start_time is not None:  # Stop tylko, gdy czas startowy istnieje
                 end_time = time.time()
-                component.time += end_time - start_time
+                elapsed_time = end_time - start_time
+                component.time += elapsed_time
                 component.series += 1
                 component.save()
-                start_time = None
+
+                # Resetujemy start_time
                 del request.session['start_time']
 
+        # Obliczamy średni wynik
         if component.series != 0:
             result = component.time / component.series
         else:
             result = 0
 
+        # Renderowanie szablonu z wynikami
         return render(request, template_name, {'result': result})
+    
     else:
         messages.error(request, 'Nie jesteś zalogowany.')
         return redirect('login_existing')
